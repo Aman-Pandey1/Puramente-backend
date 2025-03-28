@@ -1,8 +1,23 @@
 import express from "express";
 import User from "../model/User.js";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken"
+import dotenv from "dotenv";
+dotenv.config();
+
 
 const router = express.Router();
+const JWT_SECRET = process.env.JWT_SECRET
+
+router.get("/all", async (req, res) => {
+  try {
+    const users = await User.find().select("-password"); // Exclude passwords
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 
 router.post("/register", async (req, res) => {
   try {
@@ -27,18 +42,26 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
 
+    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    res.status(200).json({ message: "Login successful", user });
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, {
+      expiresIn: "12h", // Token expires in 12 hours
+    });
+
+    res.status(200).json({ message: "Login successful", token, user });
   } catch (error) {
+    console.error("Login Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });

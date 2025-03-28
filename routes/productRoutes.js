@@ -1,18 +1,59 @@
 import express from "express";
-const router = express.Router();
-import Product from "../model/Product.js";  
+import multer from "multer";
+import xlsx from "xlsx";
+import Product from "../model/Product.js";
 
-// Get all products
-router.get("/", async (req, res) => {
+const router = express.Router();
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+router.post("/admin/uploadexcel", upload.single("file"), async (req, res) => {
   try {
-    const products = await Product.find();
-    res.status(200).json(products);
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const jsonData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+    const products = jsonData.map((row) => ({
+      name: row.name,
+      code: row.code,
+      description: row.description,
+      category: row.category,
+      imageurl: row.image ,
+    }));
+
+    await Product.insertMany(products);
+
+    res.status(200).json({ message: "Products uploaded successfully", count: products.length });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-// Get a single product by ID
+router.get("/", async (req, res) => {
+  try {
+    const products = await Product.find();
+
+    const formattedProducts = products.map((product) => {
+      if (!product.image || !product.image.data) {
+        return { ...product._doc, image: null };
+      }
+      return {
+        ...product._doc,
+        image: `data:${product.image.contentType};base64,${product.image.data.toString("base64")}`,
+      };
+    });
+
+    res.status(200).json(formattedProducts);
+  } catch (err) {
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -23,11 +64,24 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Add a new product
-router.post("/admin/add", async (req, res) => {
+router.post("/admin/add", upload.single("image"), async (req, res) => {
   try {
-    const { name, category, description, imageUrl } = req.body;
-    const newProduct = new Product({name, category, description, imageUrl});
+    const { name, category, description, code } = req.body;
+
+    const image = req.file
+      ? {
+          data: req.file.buffer,
+          contentType: req.file.mimetype,
+        }
+      : null;
+
+    const newProduct = new Product({
+      name,
+      category,
+      description,
+      code,
+      image,
+    });
 
     await newProduct.save();
     res.status(201).json({ product: newProduct, message: "Product added successfully" });
@@ -36,7 +90,6 @@ router.post("/admin/add", async (req, res) => {
   }
 });
 
-// Update an existing product
 router.put("/admin/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -49,7 +102,6 @@ router.put("/admin/:id", async (req, res) => {
   }
 });
 
-// Delete a product
 router.delete("/admin/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);

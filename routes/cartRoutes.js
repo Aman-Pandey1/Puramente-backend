@@ -24,14 +24,19 @@ router.post("/add", async (req, res) => {
       cart = new Cart({ userId, items: [], totalAmount: 0 });
     }
 
-    const existingItem = cart.items.find(item => item.productId.toString() === productId);
+    const existingItem = cart.items.find(
+      (item) => item.productId.toString() === productId
+    );
     if (existingItem) {
       existingItem.quantity += quantity;
     } else {
       cart.items.push({ productId, name, price, quantity, imageUrl });
     }
 
-    cart.totalAmount = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    cart.totalAmount = cart.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
     await cart.save();
 
     res.status(200).json({ message: "Item added to cart", cart });
@@ -48,8 +53,13 @@ router.delete("/remove/:userId/:productId", async (req, res) => {
 
     if (!cart) return res.status(404).json({ message: "Cart not found" });
 
-    cart.items = cart.items.filter(item => item.productId.toString() !== productId);
-    cart.totalAmount = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    cart.items = cart.items.filter(
+      (item) => item.productId.toString() !== productId
+    );
+    cart.totalAmount = cart.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
 
     await cart.save();
     res.status(200).json({ message: "Item removed from cart", cart });
