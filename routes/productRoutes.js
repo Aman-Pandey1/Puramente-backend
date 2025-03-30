@@ -28,12 +28,10 @@ router.post("/admin/uploadexcel", upload.single("file"), async (req, res) => {
 
     await Product.insertMany(products);
 
-    res
-      .status(200)
-      .json({
-        message: "Products uploaded successfully",
-        count: products.length,
-      });
+    res.status(200).json({
+      message: "Products uploaded successfully",
+      count: products.length,
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -61,13 +59,18 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+
+
+router.get("/product", async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
-    if (!product) return res.status(404).json({ message: "Product not found" });
-    res.status(200).json(product);
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    const query = req.query.search;
+    if (!query) return res.json([]);
+    
+    const products = await Product.find({ name: { $regex: query, $options: "i" } });
+    res.json(products);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -78,6 +81,16 @@ router.get("/category/:category", async (req, res) => {
     res.json(products);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/single/:id", async (req, resp) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findById(id);
+    resp.json(product);
+  } catch (err) {
+    resp.status(500).json({ message: err.message });
   }
 });
 
