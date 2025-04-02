@@ -1,13 +1,12 @@
 import express from "express";
 import User from "../model/User.js";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken"
+import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 dotenv.config();
 
-
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET
+const JWT_SECRET = process.env.JWT_SECRET;
 
 router.get("/all", async (req, res) => {
   try {
@@ -21,14 +20,25 @@ router.get("/all", async (req, res) => {
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, contactNumber, country } = req.body;
+
+    if (!contactNumber || !country) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
 
     const userExists = await User.findOne({ email });
-    if (userExists) return res.status(400).json({ message: "User already exists" });
+    if (userExists)
+      return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User({ name, email, password: hashedPassword });
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      contactNumber,
+      country,
+    });
     await user.save();
 
     res.status(201).json({ message: "User registered successfully" });
@@ -36,7 +46,6 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
-
 
 router.post("/login", async (req, res) => {
   try {
