@@ -20,7 +20,15 @@ router.get("/all", async (req, res) => {
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, contactNumber, country } = req.body;
+    const {
+      name,
+      email,
+      password,
+      contactNumber,
+      country,
+      companyName,
+      companyWebsite,
+    } = req.body;
 
     if (!contactNumber || !country) {
       return res.status(400).json({ message: "All fields are required" });
@@ -38,6 +46,8 @@ router.post("/register", async (req, res) => {
       password: hashedPassword,
       contactNumber,
       country,
+      companyName,
+      companyWebsite,
     });
     await user.save();
 
