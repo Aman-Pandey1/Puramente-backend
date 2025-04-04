@@ -22,23 +22,10 @@ const ensureUploadsDirectory = () => {
   return uploadPath;
 };
 
-// Storage config for Excel file
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = ensureUploadsDirectory();
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `Order_${Date.now()}.xlsx`);
-  },
-});
-
-const upload = multer({ storage });
-
 // Generate structured Excel File
 const generateExcelFile = async (orderData, filePath) => {
   const workbook = new ExcelJS.Workbook();
-  
+
   // Main order details sheet
   const orderSheet = workbook.addWorksheet("Order Details");
   orderSheet.columns = [
@@ -48,7 +35,7 @@ const generateExcelFile = async (orderData, filePath) => {
 
   // Write order details in row format
   Object.entries(orderData).forEach(([key, value]) => {
-    if (key !== "orderDetails") { // Exclude orderDetails as it will go in a separate sheet
+    if (key !== "orderDetails") {
       orderSheet.addRow({ field: key, value: value });
     }
   });
@@ -64,9 +51,10 @@ const generateExcelFile = async (orderData, filePath) => {
 
   let orderItems = [];
   try {
-    orderItems = typeof orderData.orderDetails === "string" 
-      ? JSON.parse(orderData.orderDetails) 
-      : orderData.orderDetails || [];
+    orderItems =
+      typeof orderData.orderDetails === "string"
+        ? JSON.parse(orderData.orderDetails)
+        : orderData.orderDetails || [];
   } catch (error) {
     console.error("Invalid JSON format in orderDetails:", error);
     orderItems = [];
@@ -101,7 +89,16 @@ router.post("/submit-order", async (req, res) => {
     const filePath = path.join(uploadPath, `Order_${Date.now()}.xlsx`);
 
     await generateExcelFile(
-      { firstName, email, contactNumber, companyName, country, companyWebsite, message, orderDetails },
+      {
+        firstName,
+        email,
+        contactNumber,
+        companyName,
+        country,
+        companyWebsite,
+        message,
+        orderDetails,
+      },
       filePath
     );
 
@@ -119,15 +116,37 @@ router.post("/submit-order", async (req, res) => {
 
     await newOrder.save();
 
-    const downloadLink = `${process.env.BASE_URL || "http://localhost:8000"}/api/orders/download/${path.basename(filePath)}`;
+    const downloadLink = `${
+      process.env.BASE_URL || "http://localhost:8000"
+    }/api/orders/download/${path.basename(filePath)}`;
 
     res.status(200).json({
       message: "Order submitted successfully!",
+      order: newOrder,
       downloadLink,
     });
   } catch (error) {
     console.error("Order submission error:", error);
-    res.status(500).json({ error: "Internal Server Error", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
+// Get All Orders (Including Excel File Download Link)
+router.get("/", async (req, res) => {
+  try {
+    const orders = await Order.find();
+    const baseUrl = process.env.BASE_URL || "http://localhost:8000";
+
+    const formattedOrders = orders.map((order) => ({
+      ...order.toObject(),
+      downloadLink: order.excelFilePath ? `${baseUrl}${order.excelFilePath}` : null,
+    }));
+
+    res.status(200).json({ success: true, orders: formattedOrders });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 });
 
