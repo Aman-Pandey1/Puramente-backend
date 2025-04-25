@@ -59,14 +59,18 @@ router.get("/", async (req, res) => {
   }
 });
 
-
-
 router.get("/product", async (req, res) => {
   try {
     const query = req.query.search;
     if (!query) return res.json([]);
-    
-    const products = await Product.find({ name: { $regex: query, $options: "i" } });
+
+    const products = await Product.find({
+      $or: [
+        { name: { $regex: query, $options: "i" } },
+        { code: { $regex: query, $options: "i" } },
+      ],
+    });
+
     res.json(products);
   } catch (error) {
     console.error("Error fetching products:", error);

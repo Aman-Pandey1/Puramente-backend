@@ -2,14 +2,14 @@ import express from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import Order from "../model/Order.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import ExcelJS from "exceljs";
+import Order from "../model/Order.js";
+import {getNextOrderId} from "../config/getNextOrderId.js"
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
 const router = express.Router();
 
 // Ensure uploads directory exists
@@ -26,21 +26,18 @@ const ensureUploadsDirectory = () => {
 const generateExcelFile = async (orderData, filePath) => {
   const workbook = new ExcelJS.Workbook();
 
-  // Main order details sheet
   const orderSheet = workbook.addWorksheet("Order Details");
   orderSheet.columns = [
     { header: "Field", key: "field", width: 30 },
     { header: "Value", key: "value", width: 50 },
   ];
 
-  // Write order details in row format
   Object.entries(orderData).forEach(([key, value]) => {
     if (key !== "orderDetails") {
-      orderSheet.addRow({ field: key, value: value });
+      orderSheet.addRow({ field: key, value });
     }
   });
 
-  // Order items sheet
   const itemsSheet = workbook.addWorksheet("Order Items");
   itemsSheet.columns = [
     { header: "#", key: "index", width: 5 },
@@ -85,11 +82,13 @@ router.post("/submit-order", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    const orderId = await getNextOrderId(); // numeric order ID
     const uploadPath = ensureUploadsDirectory();
-    const filePath = path.join(uploadPath, `Order_${Date.now()}.xlsx`);
+    const filePath = path.join(uploadPath, `Order_${orderId}.xlsx`);
 
     await generateExcelFile(
       {
+        orderId,
         firstName,
         email,
         contactNumber,
@@ -103,6 +102,7 @@ router.post("/submit-order", async (req, res) => {
     );
 
     const newOrder = new Order({
+      orderId,
       firstName,
       email,
       contactNumber,
@@ -127,16 +127,14 @@ router.post("/submit-order", async (req, res) => {
     });
   } catch (error) {
     console.error("Order submission error:", error);
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", details: error.message });
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
 
-// Get All Orders (Including Excel File Download Link)
+// Get All Orders
 router.get("/", async (req, res) => {
   try {
-    const orders = await Order.find();
+    const orders = await Order.find().sort({ orderId: -1 });
     const baseUrl = process.env.BASE_URL || "http://localhost:8000";
 
     const formattedOrders = orders.map((order) => ({
@@ -150,7 +148,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Download Excel File Route
+// Download Excel File
 router.get("/download/:filename", (req, res) => {
   const filePath = path.join(__dirname, "../uploads", req.params.filename);
   if (fs.existsSync(filePath)) {
