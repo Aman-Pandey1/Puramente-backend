@@ -7,7 +7,7 @@ import connectDB from "./config/db.js";
 import userRegister from "./routes/userRoute.js";
 import productRoutes from "./routes/productRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
-import orderRoutes from "./routes/orderroutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
 import wishListRoutes from "./routes/wishListRoutes.js";
 
 dotenv.config();

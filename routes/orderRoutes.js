@@ -169,7 +169,7 @@ router.post("/submit-order", async (req, res) => {
         <p><strong>Contact:</strong> ${contactNumber}</p>
         <p><strong>Country:</strong> ${country}</p>
         <p><strong>Company:</strong> ${companyName}</p>
-        <p><a href="${downloadLink}">Download Quotation</a></p>
+        <p><a href="${downloadLink}">Download Order Excel file</a></p>
       `,
     };
 
