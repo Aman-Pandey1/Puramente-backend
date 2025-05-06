@@ -9,15 +9,15 @@ router.post("/send", async (req, res) => {
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-      user: "gurdeepsainig2001@gmail.com",
-      pass: "vlhodeapikacbmly", // Gmail App Password
+      user: "info@puramentejewel.com",
+      pass: process.env.EMAIL_PASS, // Gmail App Password
     },
   });
 
   // Email to Admin
   const mailOptionsToAdmin = {
-    from: "gurdeepsainig2001@gmail.com", // ✅ use your own verified email
-    to: "gurdeepsainig2001@gmail.com",
+    from: "info@puramentejewel.com", // ✅ use your own verified email
+    to: "info@puramentejewel.com",
     subject: `New Contact from ${name}`,
     html: `
       <h3>Contact Form Submission</h3>
@@ -33,7 +33,7 @@ router.post("/send", async (req, res) => {
 
   // Auto-reply to User
   const mailOptionsToUser = {
-    from: "gurdeepsainig2001@gmail.com", // ✅ again, must be your Gmail
+    from: "info@puramentejewel.com", // ✅ again, must be your Gmail
     to: email,
     subject: "Thanks for contacting us",
     html: `

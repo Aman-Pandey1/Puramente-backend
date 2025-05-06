@@ -26,8 +26,14 @@ const generateExcelFile = async (orderData, filePath) => {
 
   const logoPath = path.join(__dirname, "../assets/logo.png");
   if (fs.existsSync(logoPath)) {
-    const logoImage = workbook.addImage({ filename: logoPath, extension: "png" });
-    sheet.addImage(logoImage, { tl: { col: 0, row: 0 }, ext: { width: 160, height: 80 } });
+    const logoImage = workbook.addImage({
+      filename: logoPath,
+      extension: "png",
+    });
+    sheet.addImage(logoImage, {
+      tl: { col: 0, row: 0 },
+      ext: { width: 160, height: 80 },
+    });
   }
 
   sheet.mergeCells("C1:F1");
@@ -71,10 +77,22 @@ const generateExcelFile = async (orderData, filePath) => {
 
   sheet.addRow([]);
 
-  const headerRow = sheet.addRow(["Model No.", "Image", "Item", "Metal", "Price", "Qty", "Amount"]);
+  const headerRow = sheet.addRow([
+    "Model No.",
+    "Image",
+    "Item",
+    "Metal",
+    "Price",
+    "Qty",
+    "Amount",
+  ]);
   headerRow.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F81BD" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4F81BD" },
+    };
     cell.alignment = { vertical: "middle", horizontal: "center" };
     cell.border = {
       top: { style: "thin" },
@@ -147,21 +165,23 @@ router.post("/submit-order", async (req, res) => {
     });
     await newOrder.save();
 
-    const downloadLink = `${process.env.BASE_URL || "http://localhost:8000"}/api/orders/download/${path.basename(filePath)}`;
+    const downloadLink = `${
+      process.env.BASE_URL || "http://localhost:8000"
+    }/api/orders/download/${path.basename(filePath)}`;
 
-    // Send emails using nodemailer
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: "gurdeepsainig2001@gmail.com",
-        pass: "vlhodeapikacbmly",
+        user: "info@puramentejewel.com",
+        pass: process.env.EMAIL_PASS,
       },
     });
 
     const adminMail = {
-      from: email,
-      to: "gurdeepsainig2001@gmail.com",
+      from: "info@puramentejewel.com",
+      to: "info@puramentejewel.com",
       subject: `New Order Request from ${firstName}`,
+      text: `New Order from ${firstName}\nEmail: ${email}\nContact: ${contactNumber}\nCountry: ${country}\nDownload: ${downloadLink}`,
       html: `
         <h3>New Order Submitted</h3>
         <p><strong>Name:</strong> ${firstName}</p>
@@ -174,9 +194,10 @@ router.post("/submit-order", async (req, res) => {
     };
 
     const userMail = {
-      from: "gurdeepsainig2001@gmail.com",
+      from: "info@puramentejewel.com",
       to: email,
       subject: "Thanks for your quotation request",
+      text: `Hi ${firstName},\nThanks for reaching out to Puramente International. You can download your quote here: ${downloadLink}`,
       html: `
         <p>Dear ${firstName},</p>
         <p>Thank you for reaching out to Puramente International. We’ve received your request and will contact you shortly.</p>
@@ -188,10 +209,14 @@ router.post("/submit-order", async (req, res) => {
     await transporter.sendMail(adminMail);
     await transporter.sendMail(userMail);
 
-    res.status(200).json({ message: "Order submitted and emails sent.", downloadLink });
+    res
+      .status(200)
+      .json({ message: "Order submitted and emails sent.", downloadLink });
   } catch (error) {
     console.error("Submit Order Error:", error);
-    res.status(500).json({ error: "Internal server error.", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Internal server error.", details: error.message });
   }
 });
 
