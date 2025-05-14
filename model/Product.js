@@ -11,6 +11,8 @@ const ProductSchema = new mongoose.Schema({
     type: String,
   },
   category: { type: String, required: true },
+  subcategory: { type: String },
+
   code: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
 });

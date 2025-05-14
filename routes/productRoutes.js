@@ -23,6 +23,7 @@ router.post("/admin/uploadexcel", upload.single("file"), async (req, res) => {
       code: row.code,
       description: row.description,
       category: row.category,
+      subcategory: row.subcategory,
       imageurl: row.image,
     }));
 
@@ -59,6 +60,7 @@ router.get("/", async (req, res) => {
   }
 });
 
+
 router.get("/product", async (req, res) => {
   try {
     const query = req.query.search;
@@ -87,6 +89,16 @@ router.get("/category/:category", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+router.get('/categorys/:category/subcategory/:subcategory', async (req, res) => {
+  const { category, subcategory } = req.params;
+  try {
+    const products = await Product.find({ category, subcategory });
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
 router.get("/single/:id", async (req, resp) => {
   try {
@@ -100,7 +112,7 @@ router.get("/single/:id", async (req, resp) => {
 
 router.post("/admin/add", upload.single("image"), async (req, res) => {
   try {
-    const { name, category, description, code } = req.body;
+    const { name, category, description, code, subcategory } = req.body;
 
     const image = req.file
       ? {
@@ -112,6 +124,7 @@ router.post("/admin/add", upload.single("image"), async (req, res) => {
     const newProduct = new Product({
       name,
       category,
+      subcategory,
       description,
       code,
       image,
