@@ -1,10 +1,10 @@
 import express from "express";
+import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import ExcelJS from "exceljs";
-import nodemailer from "nodemailer";
 import Order from "../model/Order.js";
 import { getNextOrderId } from "../config/getNextOrderId.js";
 
@@ -12,19 +12,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const router = express.Router();
 
+// Ensure uploads directory exists
 const ensureUploadsDirectory = () => {
   const uploadPath = path.join(__dirname, "../uploads");
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
+    console.log(`Created uploads directory at: ${uploadPath}`);
   }
   return uploadPath;
 };
 
+// ✅ Generate Quotation Excel
 const generateExcelFile = async (orderData, filePath) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Price Quotation");
 
-  const logoPath = path.join(__dirname, "../assets/logo.png");
+  // Load logo
+  const logoPath = path.join(__dirname, "../assets/logo.png"); // Change this if your logo is elsewhere
   if (fs.existsSync(logoPath)) {
     const logoImage = workbook.addImage({
       filename: logoPath,
@@ -36,13 +40,15 @@ const generateExcelFile = async (orderData, filePath) => {
     });
   }
 
+  // Company Info
   sheet.mergeCells("C1:F1");
   sheet.getCell("C1").value = "Puramente International";
   sheet.getCell("C1").font = { size: 18, bold: true };
   sheet.getCell("C1").alignment = { horizontal: "center" };
 
   sheet.mergeCells("C2:F2");
-  sheet.getCell("C2").value = "113/101, Sector-11, Pratap Nagar, Jaipur";
+  sheet.getCell("C2").value =
+    "113/101, Sector-11, Pratap Nagar, Sanganer, Jaipur, 302033";
   sheet.getCell("C2").alignment = { horizontal: "center" };
 
   sheet.mergeCells("C3:F3");
@@ -55,20 +61,28 @@ const generateExcelFile = async (orderData, filePath) => {
   sheet.getCell("C4").alignment = { horizontal: "center" };
 
   sheet.addRow([]);
+
+  // Title
   sheet.mergeCells("A6:F6");
-  sheet.getCell("A6").value = "PRICE QUOTATION";
-  sheet.getCell("A6").font = { size: 16, bold: true };
-  sheet.getCell("A6").alignment = { vertical: "middle", horizontal: "center" };
+  const titleRow = sheet.getCell("A6");
+  titleRow.value = "PRICE QUOTATION";
+  titleRow.font = { size: 16, bold: true };
+  titleRow.alignment = { vertical: "middle", horizontal: "center" };
 
   sheet.addRow([]);
 
+  // Customer Info
   const customerInfo = [
     ["Name:", orderData.firstName || ""],
     ["Email:", orderData.email || ""],
     ["Mob.:", orderData.contactNumber || ""],
     ["Company:", orderData.companyName || ""],
-    ["Country:", orderData.country || ""],
+    ["Address:", orderData.address || ""],
+    ["Ref. No:", orderData.refNo || ""],
+    ["Date:", orderData.date || ""],
+    ["Currency:", orderData.currency || "US$"],
   ];
+
   customerInfo.forEach(([field, value]) => {
     const row = sheet.addRow([field, value]);
     row.getCell(1).font = { bold: true };
@@ -77,6 +91,7 @@ const generateExcelFile = async (orderData, filePath) => {
 
   sheet.addRow([]);
 
+  // Table Header
   const headerRow = sheet.addRow([
     "Model No.",
     "Image",
@@ -102,6 +117,7 @@ const generateExcelFile = async (orderData, filePath) => {
     };
   });
 
+  // Products
   const products = orderData.orderDetails || [];
   for (const item of products) {
     const row = sheet.addRow([
@@ -123,15 +139,33 @@ const generateExcelFile = async (orderData, filePath) => {
         right: { style: "thin" },
       };
     });
+
+    // // Insert Image
+    // if (item.imageurl && fs.existsSync(item.imageurl)) {
+    //   const imageId = workbook.addImage({
+    //     filename: item.imageurl,
+    //     extension: "png",
+    //   });
+
+    //   sheet.addImage(imageId, {
+    //     tl: { col: 1, row: row.number - 1 },
+    //     ext: { width: 50, height: 50 },
+    //   });
+
+    //   sheet.getRow(row.number).height = 60; // Increase row height for image
+    // }
   }
 
+  // Column Widths
+  const widths = [15, 15, 20, 15, 10, 8, 10];
   sheet.columns.forEach((col, idx) => {
-    col.width = [15, 15, 20, 15, 10, 8, 10][idx] || 15;
+    col.width = widths[idx] || 15;
   });
 
   await workbook.xlsx.writeFile(filePath);
 };
 
+// 📤 Submit Order API
 router.post("/submit-order", async (req, res) => {
   try {
     const {
@@ -140,6 +174,10 @@ router.post("/submit-order", async (req, res) => {
       contactNumber,
       companyName,
       country,
+      address,
+      refNo,
+      date,
+      currency,
       orderDetails,
     } = req.body;
 
@@ -151,7 +189,22 @@ router.post("/submit-order", async (req, res) => {
     const uploadPath = ensureUploadsDirectory();
     const filePath = path.join(uploadPath, `Order_${orderId}.xlsx`);
 
-    await generateExcelFile({ ...req.body, orderId }, filePath);
+    await generateExcelFile(
+      {
+        orderId,
+        firstName,
+        email,
+        contactNumber,
+        companyName,
+        country,
+        address,
+        refNo,
+        date,
+        currency,
+        orderDetails,
+      },
+      filePath
+    );
 
     const newOrder = new Order({
       orderId,
@@ -160,66 +213,34 @@ router.post("/submit-order", async (req, res) => {
       contactNumber,
       companyName,
       country,
+      address,
+      refNo,
+      date,
+      currency,
       orderDetails,
       excelFilePath: `/uploads/${path.basename(filePath)}`,
     });
+
     await newOrder.save();
 
     const downloadLink = `${
       process.env.BASE_URL || "http://localhost:8000"
     }/api/orders/download/${path.basename(filePath)}`;
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: "info@puramentejewel.com",
-        pass: process.env.EMAIL_PASS,
-      },
+    res.status(200).json({
+      message: "Order submitted successfully!",
+      order: newOrder,
+      downloadLink,
     });
-
-    const adminMail = {
-      from: "info@puramentejewel.com",
-      to: "info@puramentejewel.com",
-      subject: `New Order Request from ${firstName}`,
-      text: `New Order from ${firstName}\nEmail: ${email}\nContact: ${contactNumber}\nCountry: ${country}\nDownload: ${downloadLink}`,
-      html: `
-        <h3>New Order Submitted</h3>
-        <p><strong>Name:</strong> ${firstName}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Contact:</strong> ${contactNumber}</p>
-        <p><strong>Country:</strong> ${country}</p>
-        <p><strong>Company:</strong> ${companyName}</p>
-        <p><a href="${downloadLink}">Download Order Excel file</a></p>
-      `,
-    };
-
-    const userMail = {
-      from: "info@puramentejewel.com",
-      to: email,
-      subject: "Thanks for your quotation request",
-      text: `Hi ${firstName},\nThanks for reaching out to Puramente International. You can download your quote here: ${downloadLink}`,
-      html: `
-        <p>Dear ${firstName},</p>
-        <p>Thank you for reaching out to Puramente International. We’ve received your request and will contact you shortly.</p>
-        <p>Meanwhile, you can <a href="${downloadLink}">download your quotation</a>.</p>
-        <p>Best regards,<br/>Puramente International Team</p>
-      `,
-    };
-
-    await transporter.sendMail(adminMail);
-    await transporter.sendMail(userMail);
-
-    res
-      .status(200)
-      .json({ message: "Order submitted and emails sent.", downloadLink });
   } catch (error) {
-    console.error("Submit Order Error:", error);
+    console.error("Order submission error:", error);
     res
       .status(500)
-      .json({ error: "Internal server error.", details: error.message });
+      .json({ error: "Internal Server Error", details: error.message });
   }
 });
 
+// 📥 Download Excel API
 router.get("/download/:filename", (req, res) => {
   const filePath = path.join(__dirname, "../uploads", req.params.filename);
   if (fs.existsSync(filePath)) {
